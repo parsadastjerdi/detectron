@@ -33,6 +33,8 @@ import keras
 from keras.applications.vgg19 import VGG19, preprocess_input, decode_predictions
 from keras.preprocessing.image import load_img, img_to_array
 
+from models.ssd.classifier import Classifier
+
 
 class Detectron(Frame):
     def __init__(self, model, stream=None, master=None, **kwargs):
@@ -145,7 +147,10 @@ class Detectron(Frame):
         cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    model = VGG19(weights='imagenet')
+    # model = VGG19(weights='imagenet')
+    model = Classifier(weights_path='weights/VGG_VOC0712_SSD_300x300_ft_iter_120000.h5')
+
+    '''
     root = Tk()
 
     webcam = cv2.VideoCapture(0)
@@ -154,3 +159,4 @@ if __name__ == '__main__':
 
     app = Detectron(model=model, master=root, stream=webcam)
     app.master.mainloop()
+    '''
