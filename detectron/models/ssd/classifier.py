@@ -4,6 +4,9 @@ from keras.preprocessing import image
 from keras.optimizers import Adam
 from imageio import imread
 import numpy as np
+import matplotlib
+
+matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 
 from models.keras_ssd300 import ssd_300
@@ -70,6 +73,36 @@ class Classifier:
         print(y_pred_thresh[0])
 
         return y_pred_thresh
+    
+    def get_boxes(self, orig_images, y_pred_thresh):
+        '''
+        Return a dictionary of the boxes
+        '''
+
+        boxes = []
+
+        # colors = matplotlib.cm.rainbow(np.linspace(0, 1, 21)).tolist()
+        # colors = plt.cm.Set3(np.linspace(0, 1, 21))
+        # colors = plt.cm.hsv(np.linspace(0, 1, 21)).tolist()
+
+        colors = np.random.uniform(0, 255, size=(len(self.classes), 3))
+
+        for box in y_pred_thresh[0]:
+            # Transform bounding boxes from 300x300 to original dimensions
+            xmin = box[2] * orig_images[0].shape[1] / self.img_width
+            ymin = box[3] * orig_images[0].shape[0] / self.img_height
+            xmax = box[4] * orig_images[0].shape[1] / self.img_width
+            ymax = box[5] * orig_images[0].shape[0] / self.img_height  
+
+            # Set the color and label for the box
+            color = colors[int(box[0])]
+            label = '{}: {:.2f}'.format(self.classes[int(box[0])], box[1])
+
+            rectangle = [xmin, ymin, xmax, ymax]
+
+            boxes.append((label, rectangle, color))
+        
+        return boxes
 
 
     def display(self, orig_images, y_pred_thresh):
@@ -121,8 +154,9 @@ class Classifier:
         return (orig_images, input_images)
 
 
+
 if __name__ == '__main__':
-    classifier = Classifier(weights_path='weights/VGG_VOC0712_SSD_300x300_ft_iter_120000.h5')
+    classifier = Classifier(weights_path='../../weights/VGG_VOC0712_SSD_300x300_ft_iter_120000.h5')
     orig_images, input_images = classifier.load_image('examples/fish_bike.jpg')
     y_pred_thresh = classifier.predict(input_images)
     classifier.display(orig_images, y_pred_thresh)
