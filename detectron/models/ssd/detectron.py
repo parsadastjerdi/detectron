@@ -106,6 +106,9 @@ class Detectron(Frame):
                 img = Image.fromarray(img)
                 img = ImageTk.PhotoImage(img)
 
+                # self.frame = img
+                # self.predict()
+
                 if self.panel is None:
                     self.panel = Label(image=img)
                     self.panel.image = img

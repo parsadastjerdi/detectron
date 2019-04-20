@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 '''
 MIT License
 
@@ -29,15 +31,13 @@ References:
     Very-Deep Convolutional Networks
 '''
 
-from __future__ import absolute_import
-
 import keras
 from keras.models import Sequential
 from keras.layers import Conv2D, MaxPool2D, ZeroPadding2D
-from keras.layers import Flatten, Dense
+from keras.layers import Flatten, Dense, Dropout
 from keras.preprocessing.image import load_img, img_to_array
 
-class VGG:
+class VGG16:
     '''
     Builds the VGG16 CNN architecture and trains as well
     '''
