@@ -1,0 +1,3 @@
+[submodule "ssd"]
+	path = models/ssd
+	url = https://github.com/pierluigiferrari/ssd_keras
