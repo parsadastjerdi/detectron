@@ -1,25 +1,17 @@
 '''
-MIT License
+Copyright (C) 2019 Parsa Dastjerdi
 
-Copyright (c) 2018 Parsa Dastjerdi
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+   http://www.apache.org/licenses/LICENSE-2.0
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
 '''
 
@@ -28,6 +20,8 @@ import cv2
 import numpy as np
 from PIL import Image, ImageTk
 import threading, datetime, os
+from datetime import datetime
+
 import matplotlib
 matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
@@ -36,7 +30,8 @@ from matplotlib import pyplot as plt
 # from keras.applications.vgg19 import preprocess_input
 
 from keras.preprocessing.image import img_to_array
-from classifier import Classifier
+from pascal_classifier import PascalVOCClassifier
+from coco_classifier import CocoClassifier
 
 
 class Detectron(Frame):
@@ -79,9 +74,9 @@ class Detectron(Frame):
         self.panel = Label()
         self.panel.pack(side='top', fill='both', expand='yes')
 
-        self.screenshot_button = Button(self.master, text='Predict',
+        self.screenshot_button = Button(self.master, text='Screenshot',
                                 fg='green',
-                                command=self.predict)
+                                command=self.screenshot)
         self.screenshot_button.pack(side='left', fill='both', expand='yes', padx=10, pady=10)
 
         self.quit_button = Button(self.master, text='Quit', 
@@ -92,31 +87,35 @@ class Detectron(Frame):
     
     def poll(self):
         '''
-            Contiuously poll the webcam for new frames
+            Contiuously poll the webcam for new frames.
+            This is handled on a separate thread from Tkinter's main loop. 
         '''
 
         try:
             # while not self.exit:
             while True:
                 _, self.frame = self.stream.read()
-                # self.predict()
+                self.predict()
+                
+                # print('stream.read()')
 
+                # Tranform image so that it can be displayed within the GUI
                 img = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
                 img = cv2.flip(img, 1)
                 img = Image.fromarray(img)
                 img = ImageTk.PhotoImage(img)
 
-                # self.frame = img
-                # self.predict()
-
+                # print('post transform')
+                
                 if self.panel is None:
                     self.panel = Label(image=img)
                     self.panel.image = img
                     self.panel.pack(side='top', fill='both', expand='yes')
+                    # print('panel is none')
                 else:
                     self.panel.configure(image=img)
                     self.panel.image = img
-                    # self.predict()
+                    # print('panel is some')
 
         except RuntimeError:
             print('Caught a RuntimeError')
@@ -124,28 +123,39 @@ class Detectron(Frame):
 
     def predict(self):
         '''
-            Make a prediction based on the polled frame
+        Make a prediction based on the polled frame
+        Args:
+        Returns: 
+            Returns the new frame with the predicted bounding boxes on the image itself.
         '''
+        print('enter predict')
         orig_images = [] 
         input_images = []
         img = self.frame.copy()
 
         orig_images.append(img)
 
-        # copy current frame and transform into tensor of shape (300, 300, 3)
+        # Copy current frame and transform into tensor of shape (300, 300, 3)
         image = cv2.resize(img, (300, 300), interpolation=cv2.INTER_AREA)
-
         image = img_to_array(image)
         input_images.append(image)
         input_images = np.array(input_images)
 
+        # Get predicted class and bounding boxes for all objects within frame
         y_pred_thresh = self.model.predict(input_images)
-        self.draw_rectangles(orig_images, y_pred_thresh)
+
+        # Return image with rectangles/labels drawn on
+        self.frame = self.draw_rectangles(orig_images, y_pred_thresh)
     
 
     def draw_rectangles(self, orig_images, y_pred_thresh):
         '''
-        Display the image and draw the predicted boxes onto it
+        Take as input the original image and the predictions
+        Args:
+            orig_images:
+            y_pred_thresh:
+        Returns:
+            A single image that contains the bounding boxes/classes for each object
         '''
 
         for label, box, color in self.model.get_boxes(orig_images, y_pred_thresh):
@@ -156,17 +166,26 @@ class Detectron(Frame):
 
             cv2.rectangle(img=orig_images[0], pt1=(xmin, ymin), pt2=(xmax, ymax), color=color, thickness=2, lineType=cv2.LINE_AA)
             cv2.putText(img=orig_images[0], text=label, org=(xmin, ymin), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1.0, color=(255, 255, 255), lineType=cv2.LINE_AA) 
-        
-        # cv2.imwrite('images/' + label.split(':')[0] + '.jpg', orig_images[0])
-        # self.panel = orig_images[0]
-        cv2.imshow("Prediction", orig_images[0])
+           
+        # cv2.imshow("Prediction", orig_images[0])
+
+        return orig_images[0]
     
 
     def screenshot(self):
         '''
         Take a screenshot of the image and save it under the screenshots folder
         '''
-        pass
+        # time = str(datetime.now().year) + '-' + str(datetime.now().month) + '-' + str(datetime.now().day) + '-' + str(datetime.now().hour) + '-' + datetime.now().minute + '-' + datetime.now().second       
+        self.predict()
+        '''
+        ts = datetime.now()
+        filename = "images/{}.jpg".format(ts.strftime("%Y-%m-%d_%H-%M-%S"))
+        cv2.imwrite(filename, self.frame.copy())
+
+        print(type(self.frame))
+        print(type(self.predict(self.frame.copy())))
+        '''
             
 
     def quit(self):
@@ -181,7 +200,8 @@ class Detectron(Frame):
 
 
 if __name__ == '__main__':
-    model = Classifier(weights_path='../../weights/VGG_VOC0712_SSD_300x300_ft_iter_120000.h5')
+    model = PascalVOCClassifier(weights_path='../../weights/VGG_VOC0712_SSD_300x300_ft_iter_120000.h5')
+    # model = CocoClassifier(weights_path='../../weights/VGG_coco_SSD_300x300_iter_400000.h5')
 
     root = Tk()
     stream=cv2.VideoCapture(0)

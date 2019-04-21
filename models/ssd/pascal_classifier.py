@@ -1,18 +1,51 @@
+'''
+Copyright (C) 2019 Parsa Dastjerdi
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+'''
+
+from __future__ import absolute_import
+
 from keras import backend as K
 from keras.models import load_model
 from keras.preprocessing import image
 from keras.optimizers import Adam
+
 from imageio import imread
 import numpy as np
 import matplotlib
 
+# Need this in order to matplotlib and tkinter at the same time
 matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 
 from models.keras_ssd300 import ssd_300
 from keras_loss_function.keras_ssd_loss import SSDLoss
 
-class Classifier:
+import tensorflow as tf 
+global graph
+graph = tf.get_default_graph()
+
+
+
+'''
+Description:
+    This is a simple wrapper class for the ssd_keras ssd implementation using the Pascal VOC dataset. 
+    It is used to clean up some of
+    the code inside the detectron.py file.
+'''
+class PascalVOCClassifier:
     img_height = 300
     img_width = 300
     classes = ['background',
@@ -57,13 +90,17 @@ class Classifier:
         ssd_loss = SSDLoss(neg_pos_ratio=3, alpha=1.0)
         self.model.compile(optimizer=adam, loss=ssd_loss.compute_loss)
 
+        # This is needed to deal with the error I was getting
+        self.model._make_predict_function()
+
 
     def predict(self, img):
         '''
         Predict the bounding boxes and class for a given image
         '''
+        with graph.as_default():
+            y_pred = self.model.predict(img)
 
-        y_pred = self.model.predict(img)
         confidence_threshold = 0.5
         y_pred_thresh = [y_pred[k][y_pred[k,:,1] > confidence_threshold] for k in range(y_pred.shape[0])]
 
@@ -74,17 +111,13 @@ class Classifier:
 
         return y_pred_thresh
     
+    
     def get_boxes(self, orig_images, y_pred_thresh):
         '''
-        Return a dictionary of the boxes
+        Return boxes
         '''
 
         boxes = []
-
-        # colors = matplotlib.cm.rainbow(np.linspace(0, 1, 21)).tolist()
-        # colors = plt.cm.Set3(np.linspace(0, 1, 21))
-        # colors = plt.cm.hsv(np.linspace(0, 1, 21)).tolist()
-
         colors = np.random.uniform(0, 255, size=(len(self.classes), 3))
 
         for box in y_pred_thresh[0]:
@@ -156,7 +189,7 @@ class Classifier:
 
 
 if __name__ == '__main__':
-    classifier = Classifier(weights_path='../../weights/VGG_VOC0712_SSD_300x300_ft_iter_120000.h5')
+    classifier = PascalVOCClassifier(weights_path='../../weights/VGG_VOC0712_SSD_300x300_ft_iter_120000.h5')
     orig_images, input_images = classifier.load_image('examples/fish_bike.jpg')
     y_pred_thresh = classifier.predict(input_images)
     classifier.display(orig_images, y_pred_thresh)
