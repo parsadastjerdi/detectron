@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 '''
-
 from tkinter import *
 import cv2
 import numpy as np
@@ -26,12 +25,8 @@ import matplotlib
 matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 
-
-# from keras.applications.vgg19 import preprocess_input
-
 from keras.preprocessing.image import img_to_array
-from pascal_classifier import PascalVOCClassifier
-from coco_classifier import CocoClassifier
+from classifier import PascalVOCClassifier
 
 
 class Detectron(Frame):
@@ -96,26 +91,21 @@ class Detectron(Frame):
             while True:
                 _, self.frame = self.stream.read()
                 self.predict()
-                
-                # print('stream.read()')
 
                 # Tranform image so that it can be displayed within the GUI
                 img = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
-                img = cv2.flip(img, 1)
+                # img = cv2.flip(img, 1)
                 img = Image.fromarray(img)
                 img = ImageTk.PhotoImage(img)
 
-                # print('post transform')
                 
                 if self.panel is None:
                     self.panel = Label(image=img)
                     self.panel.image = img
                     self.panel.pack(side='top', fill='both', expand='yes')
-                    # print('panel is none')
                 else:
                     self.panel.configure(image=img)
                     self.panel.image = img
-                    # print('panel is some')
 
         except RuntimeError:
             print('Caught a RuntimeError')
@@ -128,12 +118,10 @@ class Detectron(Frame):
         Returns: 
             Returns the new frame with the predicted bounding boxes on the image itself.
         '''
-        print('enter predict')
-        orig_images = [] 
-        input_images = []
-        img = self.frame.copy()
 
-        orig_images.append(img)
+        input_images = []
+
+        img = self.frame.copy()
 
         # Copy current frame and transform into tensor of shape (300, 300, 3)
         image = cv2.resize(img, (300, 300), interpolation=cv2.INTER_AREA)
@@ -144,11 +132,11 @@ class Detectron(Frame):
         # Get predicted class and bounding boxes for all objects within frame
         y_pred_thresh = self.model.predict(input_images)
 
-        # Return image with rectangles/labels drawn on
-        self.frame = self.draw_rectangles(orig_images, y_pred_thresh)
+        # Return image with boxes/labels drawn on
+        self.draw_boxes(img, y_pred_thresh)
     
 
-    def draw_rectangles(self, orig_images, y_pred_thresh):
+    def draw_boxes(self, img, y_pred_thresh):
         '''
         Take as input the original image and the predictions
         Args:
@@ -158,34 +146,29 @@ class Detectron(Frame):
             A single image that contains the bounding boxes/classes for each object
         '''
 
-        for label, box, color in self.model.get_boxes(orig_images, y_pred_thresh):
-            xmin = int(box[0])
-            ymin = int(box[1])
-            xmax = int(box[2])
-            ymax = int(box[3])
+        for box in y_pred_thresh[0]:
+            # Transform bounding boxes from 300x300 to original dimensions
+            xmin = int(box[2] * img.shape[1] / self.model.img_width)
+            ymin = int(box[3] * img.shape[0] / self.model.img_height)
+            xmax = int(box[4] * img.shape[1] / self.model.img_width)
+            ymax = int(box[5] * img.shape[0] / self.model.img_height)
 
-            cv2.rectangle(img=orig_images[0], pt1=(xmin, ymin), pt2=(xmax, ymax), color=color, thickness=2, lineType=cv2.LINE_AA)
-            cv2.putText(img=orig_images[0], text=label, org=(xmin, ymin), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1.0, color=(255, 255, 255), lineType=cv2.LINE_AA) 
-           
-        # cv2.imshow("Prediction", orig_images[0])
+            color = self.model.colors[int(box[0])]
+            label = '{}: {:.2f}'.format(self.model.classes[int(box[0])], box[1])
 
-        return orig_images[0]
+            cv2.rectangle(img=img, pt1=(xmin, ymin), pt2=(xmax, ymax), color=color, thickness=2, lineType=cv2.LINE_AA)
+            cv2.putText(img=img, text=label, org=(xmin, ymin), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1.0, color=(255, 255, 255), lineType=cv2.LINE_AA) 
+
+        self.frame = img
     
 
     def screenshot(self):
         '''
-        Take a screenshot of the image and save it under the screenshots folder
-        '''
-        # time = str(datetime.now().year) + '-' + str(datetime.now().month) + '-' + str(datetime.now().day) + '-' + str(datetime.now().hour) + '-' + datetime.now().minute + '-' + datetime.now().second       
-        self.predict()
-        '''
+        Take a screenshot of the image and save in the images folder
+        '''      
         ts = datetime.now()
         filename = "images/{}.jpg".format(ts.strftime("%Y-%m-%d_%H-%M-%S"))
         cv2.imwrite(filename, self.frame.copy())
-
-        print(type(self.frame))
-        print(type(self.predict(self.frame.copy())))
-        '''
             
 
     def quit(self):
@@ -200,8 +183,8 @@ class Detectron(Frame):
 
 
 if __name__ == '__main__':
-    model = PascalVOCClassifier(weights_path='../../weights/VGG_VOC0712_SSD_300x300_ft_iter_120000.h5')
-    # model = CocoClassifier(weights_path='../../weights/VGG_coco_SSD_300x300_iter_400000.h5')
+    model = PascalVOCClassifier(weights_path='weights/VGG_VOC0712_SSD_300x300_ft_iter_120000.h5')
+    # model = CocoClassifier(weights_path='weights/VGG_coco_SSD_300x300_iter_400000.h5')
 
     root = Tk()
     stream=cv2.VideoCapture(0)
