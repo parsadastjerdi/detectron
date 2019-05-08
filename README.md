@@ -9,6 +9,7 @@ This project contains a simple GUI built with Tkinter and OpenCV to test the obj
 - OpenCV
 - Beautiful Soup 4.x
 - Tkinter
+- Matplotlib
 
 
 ## Usage
