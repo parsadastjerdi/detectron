@@ -173,13 +173,8 @@ class Detectron(Frame):
 
     def quit(self):
         print('Exiting application.')
-        self.master.destroy()
-
-        '''
-        self.exit = True
         self.stream.release()
-        cv2.destroyAllWindows()
-        '''
+        self.master.destroy()
 
 
 if __name__ == '__main__':
